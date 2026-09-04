@@ -150,6 +150,22 @@ Detailed:
 Using Maps Grounding Lite only, find the five closest coffee sellers to Alder & Oak Coffee – East Austin (STR-002) at 1904 E Cesar Chavez St, Austin, TX 78702. Include each returned Google Maps source link immediately after that business. End with two sentences about competitive intensity. Do not search the web or inspect files.
 ```
 
+### 6. Additional delivery and launch planning
+
+Run each prompt separately:
+
+```text
+Before we promote Guatemala Geisha beans on DoorDash, check whether we can actually fulfill delivery orders for it right now
+```
+
+```text
+Which residential buildings near SITE-002 are worth a launch-week promo?
+```
+
+```text
+Which gyms and coworking spaces near SITE-002 should we partner with?
+```
+
 ## Uninstall
 
 Exit the agent, then run:
