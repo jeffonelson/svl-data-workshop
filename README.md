@@ -15,16 +15,36 @@ gcloud auth login
 gcloud auth application-default login
 ```
 
-Install and verify:
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/jeffonelson/svl-data-workshop.git
 cd svl-data-workshop
-./bin/setup YOUR_PROJECT_ID
+```
+
+### 2. Configure and verify
+
+Replace the placeholder below, including the angle brackets, with your assigned
+Google Cloud project ID.
+
+`./bin/setup` checks access to your assigned project and secrets, then installs
+and configures the Data Agent Kit plugin for each supported agent on your computer.
+
+```bash
+./bin/setup <INSERT_YOUR_GOOGLE_CLOUD_PROJECT_ID>
+```
+
+`./bin/doctor` runs read-only checks for the required software, Google Cloud
+authentication, plugin installation, and MCP configuration.
+
+```bash
 ./bin/doctor
 ```
 
-Launch one agent:
+### 3. Launch one agent
+
+Use a workshop launcher instead of running `codex` or `claude` directly so it
+can load the workshop credentials and project settings before starting the agent.
 
 ```bash
 ./bin/workshop-codex
@@ -38,10 +58,13 @@ Trust the repository when prompted. Keep this session open for the entire lab.
 
 ## Connectivity check
 
-Run `/mcp`, then paste:
+First, run `/mcp` in the agent and confirm that the Developer Knowledge, Maps
+Grounding Lite, BigQuery, and AlloyDB MCP servers are loaded.
+
+Then paste the following prompt into the same agent session and run it:
 
 ```text
-Use the MCP tools for these checks. Read .workshop-state/project.env if needed to identify the configured project. Do not use gcloud commands as a substitute for the MCP connectivity checks, and do not modify anything. Make one successful read-only call to each service:
+Use the MCP tools for these checks. Make one successful read-only call to each service:
 
 1. Developer Knowledge: retrieve the official BigQuery row-level security documentation.
 2. Maps: find two coffee shops near Golden Gate Park and include their Google Maps links.
@@ -118,13 +141,13 @@ Using BigQuery MCP only, forecast 26 weeks of mcp_retail.market_demand by ZIP wi
 Short:
 
 ```text
-What are the five closest coffee competitors to the site you recommended?
+What are the five closest coffee competitors to Alder & Oak Coffee – East Austin (STR-002) at 1904 E Cesar Chavez St, Austin, TX 78702?
 ```
 
 Detailed:
 
 ```text
-Using Maps Grounding Lite only, find the five closest coffee sellers to the recommended site from the previous answer. Include each returned Google Maps source link immediately after that business. End with two sentences about competitive intensity. Do not search the web or inspect files.
+Using Maps Grounding Lite only, find the five closest coffee sellers to Alder & Oak Coffee – East Austin (STR-002) at 1904 E Cesar Chavez St, Austin, TX 78702. Include each returned Google Maps source link immediately after that business. End with two sentences about competitive intensity. Do not search the web or inspect files.
 ```
 
 ## Uninstall
