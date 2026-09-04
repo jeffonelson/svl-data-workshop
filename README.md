@@ -137,3 +137,9 @@ Exit the agent, then run:
 
 This removes workshop-installed agent plugins and local workshop state. It does
 not change Google Cloud or delete this repository.
+
+## Disclaimer
+
+This is a project intended for demonstration and workshop purposes only. It is
+not intended for use in a production environment. This repository is not an
+officially supported Google product.
