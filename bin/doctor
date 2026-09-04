@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/workshop-common.sh
+source "$repo_root/bin/lib/workshop-common.sh"
+workshop_load_config
+
+GCP_PROJECT_ID="$(workshop_saved_project)"
+workshop_source_env_local
+
+failures=0
+warnings=0
+
+pass() { printf 'PASS  %s\n' "$1"; }
+fail() { printf 'FAIL  %s\n' "$1"; failures=$((failures + 1)); }
+warn() { printf 'WARN  %s\n' "$1"; warnings=$((warnings + 1)); }
+
+check_command() {
+  if command -v "$1" >/dev/null 2>&1; then
+    pass "$1 is installed"
+  else
+    fail "$1 is not installed"
+  fi
+}
+
+check_command gcloud
+check_command node
+check_command npm
+
+has_codex=false
+has_claude=false
+if command -v codex >/dev/null 2>&1; then
+  has_codex=true
+  pass "codex is installed"
+fi
+if command -v claude >/dev/null 2>&1; then
+  has_claude=true
+  pass "claude is installed"
+fi
+if [[ "$has_codex" == false && "$has_claude" == false ]]; then
+  fail "no supported coding agent is installed (codex or claude)"
+fi
+
+if workshop_project_id_is_valid "${GCP_PROJECT_ID:-}"; then
+  pass "workshop project is configured ($GCP_PROJECT_ID)"
+  workshop_export_project_env "$GCP_PROJECT_ID"
+else
+  unset GCP_PROJECT_ID
+  fail "no valid workshop project is configured; run: ./bin/setup PROJECT_ID"
+fi
+
+if command -v gcloud >/dev/null 2>&1; then
+  active_account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
+  if [[ -n "$active_account" ]]; then
+    pass "gcloud has an active account ($active_account)"
+  else
+    fail "gcloud has no active account; run: gcloud auth login"
+  fi
+
+  if gcloud auth application-default print-access-token >/dev/null 2>&1; then
+    pass "Application Default Credentials are available"
+  else
+    fail "ADC is unavailable; run: gcloud auth application-default login"
+  fi
+fi
+
+check_secret_source() {
+  local variable_name="$1"
+  local secret_id="$2"
+
+  if [[ -n "${!variable_name:-}" ]]; then
+    pass "$variable_name is available from the environment"
+    return
+  fi
+
+  if [[ -z "${GCP_PROJECT_ID:-}" ]]; then
+    fail "$variable_name is unset and no workshop project is configured"
+    return
+  fi
+
+  if ! command -v gcloud >/dev/null 2>&1; then
+    fail "$variable_name is unset and gcloud is unavailable"
+    return
+  fi
+
+  if gcloud secrets versions access "$SECRET_VERSION" \
+    --secret="$secret_id" \
+    --project="$GCP_PROJECT_ID" \
+    >/dev/null 2>&1; then
+    pass "$variable_name can be loaded from Secret Manager"
+  else
+    fail "Cannot access Secret Manager secret $secret_id in $GCP_PROJECT_ID"
+  fi
+}
+
+check_secret_source WORKSHOP_DK_API_KEY "$DK_SECRET_ID"
+check_secret_source WORKSHOP_MAPS_API_KEY "$MAPS_SECRET_ID"
+
+if [[ "$has_codex" == true ]]; then
+  plugins_json="$(codex plugin list --json 2>/dev/null)"
+  if grep -Fq "\"pluginId\": \"$DAK_PLUGIN\"" <<<"$plugins_json"; then
+    pass "Codex: Data Agent Kit plugin is installed"
+  else
+    fail "Codex: Data Agent Kit plugin is not installed; run: ./bin/setup"
+  fi
+
+  mcp_json="$(cd "$repo_root" && codex mcp list --json 2>/dev/null)"
+  if grep -Fq 'google_developer_knowledge' <<<"$mcp_json"; then
+    pass "Codex: Developer Knowledge MCP configuration is visible"
+  else
+    warn "Codex: Developer Knowledge MCP is not visible; trust the project and restart Codex"
+  fi
+
+  if grep -Fq 'maps_grounding_lite' <<<"$mcp_json"; then
+    pass "Codex: Maps Grounding Lite MCP configuration is visible"
+  else
+    warn "Codex: Maps Grounding Lite MCP is not visible; trust the project and restart Codex"
+  fi
+fi
+
+if [[ "$has_claude" == true ]]; then
+  # Check what is actually installed rather than what setup declared, so a
+  # failed or partial install cannot report as healthy.
+  claude_marketplace_json="$(claude plugin marketplace list --json 2>/dev/null || printf '[]')"
+  claude_marketplace_ref="$(
+    dak_marketplace="$DAK_MARKETPLACE" \
+    node -e '
+      let list = [];
+      try { list = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch (error) {}
+      const entry = list.find((m) => m && m.name === process.env.dak_marketplace);
+      if (!entry) { console.log("__MISSING__"); }
+      else { console.log(entry.ref || "__DEFAULT_BRANCH__"); }
+    ' <<<"$claude_marketplace_json" 2>/dev/null
+  )"
+
+  if [[ "$claude_marketplace_ref" == "__MISSING__" || -z "$claude_marketplace_ref" ]]; then
+    fail "Claude Code: marketplace $DAK_MARKETPLACE is not configured; run: ./bin/setup PROJECT_ID"
+  elif [[ -z "${DAK_REF:-}" ]]; then
+    if [[ "$claude_marketplace_ref" == "__DEFAULT_BRANCH__" ]]; then
+      pass "Claude Code: marketplace tracks the default branch"
+    else
+      fail "Claude Code: marketplace is pinned to ref $claude_marketplace_ref, but config/workshop.env pins no ref"
+    fi
+  elif [[ "$claude_marketplace_ref" == "$DAK_REF" ]]; then
+    pass "Claude Code: marketplace is pinned to ref $DAK_REF"
+  else
+    fail "Claude Code: marketplace ref is $claude_marketplace_ref; config/workshop.env expects $DAK_REF"
+  fi
+
+  claude_plugins_json="$(claude plugin list --json 2>/dev/null || printf '[]')"
+  claude_plugin_report="$(
+    dak_plugin="$DAK_PLUGIN" \
+    dak_project_id="${GCP_PROJECT_ID:-}" \
+    node -e '
+      const fs = require("fs");
+      let list = [];
+      try { list = JSON.parse(fs.readFileSync(0, "utf8")); } catch (error) {}
+      const plugin = process.env.dak_plugin;
+      const entry = list.find((p) => p && p.id === plugin);
+      if (!entry) {
+        console.log("FAIL plugin " + plugin + " is not installed; run: ./bin/setup PROJECT_ID");
+      } else {
+        if (entry.enabled) {
+          console.log("PASS plugin " + plugin + " is installed and enabled (scope: " + entry.scope + ")");
+        } else {
+          console.log("FAIL plugin " + plugin + " is installed but disabled");
+        }
+        if (entry.installPath && !fs.existsSync(entry.installPath)) {
+          console.log("FAIL plugin files are missing from " + entry.installPath);
+        }
+        const servers = Object.keys(entry.mcpServers || {});
+        if (servers.length > 0) {
+          console.log("PASS plugin provides " + servers.length + " MCP server(s)");
+        } else {
+          console.log("WARN plugin declares no MCP servers");
+        }
+      }
+    ' <<<"$claude_plugins_json" 2>/dev/null
+  )"
+
+  if [[ -z "$claude_plugin_report" ]]; then
+    fail "Claude Code: could not read the installed plugin list"
+  else
+    while IFS= read -r line; do
+      case "$line" in
+        PASS\ *) pass "Claude Code: ${line#PASS }" ;;
+        WARN\ *) warn "Claude Code: ${line#WARN }" ;;
+        *) fail "Claude Code: ${line#FAIL }" ;;
+      esac
+    done <<<"$claude_plugin_report"
+  fi
+
+  # claude plugin install --config stores the plugin options in the user
+  # settings file, so verify the project there rather than in the repository.
+  claude_user_settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+  if [[ -z "${GCP_PROJECT_ID:-}" ]]; then
+    warn "Claude Code: plugin PROJECT_ID cannot be compared; no workshop project is configured"
+  else
+    claude_plugin_project="$(
+      claude_user_settings="$claude_user_settings" \
+      dak_plugin="$DAK_PLUGIN" \
+      node -e '
+        const fs = require("fs");
+        let settings = {};
+        try { settings = JSON.parse(fs.readFileSync(process.env.claude_user_settings, "utf8")); } catch (error) {}
+        const entry = (settings.pluginConfigs || {})[process.env.dak_plugin] || {};
+        console.log((entry.options || {}).PROJECT_ID || "");
+      ' 2>/dev/null
+    )"
+    if [[ "$claude_plugin_project" == "$GCP_PROJECT_ID" ]]; then
+      pass "Claude Code: plugin PROJECT_ID matches the workshop project"
+    else
+      fail "Claude Code: plugin PROJECT_ID is \"$claude_plugin_project\"; expected $GCP_PROJECT_ID"
+    fi
+  fi
+
+  claude_mcp="$(cd "$repo_root" && claude mcp list 2>/dev/null)"
+  for server in google_developer_knowledge maps_grounding_lite; do
+    if grep -Fq "$server" <<<"$claude_mcp"; then
+      pass "Claude Code: $server MCP configuration is visible"
+    else
+      warn "Claude Code: $server MCP is not visible; trust the project and restart Claude Code"
+    fi
+  done
+fi
+
+echo
+printf 'Doctor finished with %d failure(s) and %d warning(s).\n' "$failures" "$warnings"
+(( failures == 0 ))
