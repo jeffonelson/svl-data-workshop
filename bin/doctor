@@ -192,27 +192,28 @@ if [[ "$has_claude" == true ]]; then
   fi
 
   # claude plugin install --config stores the plugin options in the user
-  # settings file, so verify the project there rather than in the repository.
+  # settings file, so verify them there rather than in the repository.
+  #
+  # GCP_REGION is the only option the plugin declares since DAK 0.10.1, and it
+  # is worth checking: it fills the region placeholder in the Dataproc MCP URL,
+  # and an unfilled placeholder makes that server register zero tools with no
+  # error message at all.
   claude_user_settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
-  if [[ -z "${GCP_PROJECT_ID:-}" ]]; then
-    warn "Claude Code: plugin PROJECT_ID cannot be compared; no workshop project is configured"
+  claude_plugin_region="$(
+    claude_user_settings="$claude_user_settings" \
+    dak_plugin="$DAK_PLUGIN" \
+    node -e '
+      const fs = require("fs");
+      let settings = {};
+      try { settings = JSON.parse(fs.readFileSync(process.env.claude_user_settings, "utf8")); } catch (error) {}
+      const entry = (settings.pluginConfigs || {})[process.env.dak_plugin] || {};
+      console.log((entry.options || {}).GCP_REGION || "");
+    ' 2>/dev/null
+  )"
+  if [[ "$claude_plugin_region" == "$DAK_GCP_REGION" ]]; then
+    pass "Claude Code: plugin GCP_REGION matches config/workshop.env ($DAK_GCP_REGION)"
   else
-    claude_plugin_project="$(
-      claude_user_settings="$claude_user_settings" \
-      dak_plugin="$DAK_PLUGIN" \
-      node -e '
-        const fs = require("fs");
-        let settings = {};
-        try { settings = JSON.parse(fs.readFileSync(process.env.claude_user_settings, "utf8")); } catch (error) {}
-        const entry = (settings.pluginConfigs || {})[process.env.dak_plugin] || {};
-        console.log((entry.options || {}).PROJECT_ID || "");
-      ' 2>/dev/null
-    )"
-    if [[ "$claude_plugin_project" == "$GCP_PROJECT_ID" ]]; then
-      pass "Claude Code: plugin PROJECT_ID matches the workshop project"
-    else
-      fail "Claude Code: plugin PROJECT_ID is \"$claude_plugin_project\"; expected $GCP_PROJECT_ID"
-    fi
+    fail "Claude Code: plugin GCP_REGION is \"$claude_plugin_region\"; expected $DAK_GCP_REGION"
   fi
 
   claude_mcp="$(cd "$repo_root" && claude mcp list 2>/dev/null)"

@@ -101,8 +101,16 @@ if [[ "$has_codex" == true ]]; then
   if grep -Fq "\"name\": \"$DAK_MARKETPLACE\"" <<<"$marketplaces_json"; then
     echo "Marketplace already configured: $DAK_MARKETPLACE"
   else
-    echo "Adding Data Agent Kit marketplace at ref: $DAK_REF"
-    codex plugin marketplace add "$DAK_REPOSITORY" --ref "$DAK_REF"
+    # Codex takes the ref as a flag; Claude Code takes it as a URL fragment
+    # further down. Both read the same DAK_REF, and both track the default
+    # branch when it is empty.
+    if [[ -n "${DAK_REF:-}" ]]; then
+      echo "Adding Data Agent Kit marketplace at ref: $DAK_REF"
+      codex plugin marketplace add "$DAK_REPOSITORY" --ref "$DAK_REF"
+    else
+      echo "Adding Data Agent Kit marketplace at the default branch"
+      codex plugin marketplace add "$DAK_REPOSITORY"
+    fi
     touch "$state_dir/marketplace-added-by-workshop"
   fi
 
@@ -146,10 +154,11 @@ if [[ "$has_claude" == true ]]; then
     echo "Plugin already installed: $DAK_PLUGIN"
   else
     echo "Installing Data Agent Kit plugin..."
+    # GCP_REGION is the only option the plugin declares since DAK 0.10.1.
+    # PROJECT_ID and BIGQUERY_LOCATION were removed upstream; the MCP servers
+    # take the project as a tool argument instead.
     claude plugin install "$DAK_PLUGIN" --yes \
-      --config "PROJECT_ID=$GCP_PROJECT_ID" \
-      --config "GCP_REGION=$DAK_GCP_REGION" \
-      --config "BIGQUERY_LOCATION=$DAK_BIGQUERY_LOCATION"
+      --config "GCP_REGION=$DAK_GCP_REGION"
     touch "$state_dir/claude-plugin-added-by-workshop"
   fi
 fi
