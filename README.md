@@ -59,7 +59,12 @@ Trust the repository when prompted. Keep this session open for the entire lab.
 ## Connectivity check
 
 First, run `/mcp` in the agent and confirm that the Developer Knowledge, Maps
-Grounding Lite, BigQuery, and AlloyDB MCP servers are loaded.
+Grounding Lite, Cloud Run, BigQuery, and AlloyDB MCP servers are loaded.
+
+Cloud Run is the one server here that needs no API key: it acts as you, using
+the Google Cloud credentials you logged in with. Seeing it listed is not proof
+that it works, because it lists its tools without checking credentials at all.
+`./bin/doctor` makes a real call to it, so trust the doctor over the list.
 
 Then paste the following prompt into the same agent session and run it:
 

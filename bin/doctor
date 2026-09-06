@@ -120,6 +120,18 @@ if [[ "$has_codex" == true ]]; then
   else
     warn "Codex: Maps Grounding Lite MCP is not visible; trust the project and restart Codex"
   fi
+
+  if grep -Fq 'cloud_run' <<<"$mcp_json"; then
+    pass "Codex: Cloud Run MCP configuration is visible"
+  else
+    warn "Codex: Cloud Run MCP is not visible; trust the project and restart Codex"
+  fi
+
+  if codex_proxy="$(workshop_dak_proxy_path codex)"; then
+    pass "Codex: Data Agent Kit MCP proxy found ($codex_proxy)"
+  else
+    fail "Codex: cannot locate the Data Agent Kit MCP proxy; the Cloud Run MCP will not start"
+  fi
 fi
 
 if [[ "$has_claude" == true ]]; then
@@ -220,14 +232,98 @@ if [[ "$has_claude" == true ]]; then
   fi
 
   claude_mcp="$(cd "$repo_root" && claude mcp list 2>/dev/null)"
-  for server in google_developer_knowledge maps_grounding_lite; do
+  for server in google_developer_knowledge maps_grounding_lite cloud_run; do
     if grep -Fq "$server" <<<"$claude_mcp"; then
       pass "Claude Code: $server MCP configuration is visible"
     else
       warn "Claude Code: $server MCP is not visible; trust the project and restart Claude Code"
     fi
   done
+
+  if claude_proxy="$(workshop_dak_proxy_path claude)"; then
+    pass "Claude Code: Data Agent Kit MCP proxy found ($claude_proxy)"
+  else
+    fail "Claude Code: cannot locate the Data Agent Kit MCP proxy; the Cloud Run MCP will not start"
+  fi
 fi
+
+# Cloud Run is the one MCP server here that answers tools/list without any
+# credential at all. A server that is merely "visible" therefore proves nothing:
+# an attendee with broken credentials still sees five tools listed and only
+# discovers the problem when a tool call fails mid-exercise. Call a read-only
+# tool for real and require a real result.
+check_cloud_run_mcp() {
+  local token request response verdict
+
+  if [[ -z "${GCP_PROJECT_ID:-}" ]]; then
+    fail "Cloud Run MCP: no workshop project is configured"
+    return
+  fi
+
+  for required in curl gcloud node; do
+    if ! command -v "$required" >/dev/null 2>&1; then
+      warn "Cloud Run MCP: cannot verify without $required"
+      return
+    fi
+  done
+
+  if ! token="$(gcloud auth application-default print-access-token 2>/dev/null)" ||
+    [[ -z "$token" ]]; then
+    fail "Cloud Run MCP: no ADC access token; run: gcloud auth application-default login"
+    return
+  fi
+
+  printf -v request \
+    '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_services","arguments":{"project":"%s","region":"%s"}}}' \
+    "$GCP_PROJECT_ID" "$CLOUD_RUN_REGION"
+
+  # The access token is written to curl's stdin config, never passed as an
+  # argument, so it cannot appear in a process listing.
+  response="$(
+    printf 'header = "Authorization: Bearer %s"\n' "$token" |
+      curl --silent --max-time 30 --config - \
+        --header 'Content-Type: application/json' \
+        --request POST "$CLOUD_RUN_MCP_URL" \
+        --data "$request" 2>/dev/null
+  )"
+  unset token
+
+  if [[ -z "$response" ]]; then
+    fail "Cloud Run MCP: no response from $CLOUD_RUN_MCP_URL"
+    return
+  fi
+
+  verdict="$(
+    node -e '
+      let doc = {};
+      try { doc = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch (error) {
+        console.log("FAIL the server returned a non-JSON response");
+        process.exit(0);
+      }
+      const result = doc.result || {};
+      const text = (result.content || [])
+        .map((part) => (part && part.text) || "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (doc.error) {
+        console.log("FAIL " + (doc.error.message || "the server returned an error"));
+      } else if (result.isError) {
+        console.log("FAIL " + (text || "the tool call was rejected"));
+      } else {
+        console.log("PASS list_services answered for this project");
+      }
+    ' <<<"$response" 2>/dev/null
+  )"
+
+  case "$verdict" in
+    PASS\ *) pass "Cloud Run MCP: ${verdict#PASS }" ;;
+    FAIL\ *) fail "Cloud Run MCP: ${verdict#FAIL }" ;;
+    *) fail "Cloud Run MCP: could not interpret the server response" ;;
+  esac
+}
+
+check_cloud_run_mcp
 
 echo
 printf -v summary 'Doctor finished with %d failure(s) and %d warning(s).' "$failures" "$warnings"

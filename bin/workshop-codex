@@ -11,7 +11,7 @@ if ! command -v codex >/dev/null 2>&1; then
   exit 1
 fi
 
-workshop_prepare_launch
+workshop_prepare_launch codex
 workshop_info "Launching Codex for project: $WORKSHOP_PROJECT_ID"
 
 cd "$repo_root"

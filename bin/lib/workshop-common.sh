@@ -175,12 +175,121 @@ workshop_load_secret_if_unset() {
   unset secret_value
 }
 
+# ---------------------------------------------------------------------------
+# Data Agent Kit MCP proxy
+#
+# The Cloud Run MCP server is an ordinary Google Cloud endpoint that wants an
+# OAuth access token, not an API key. The Data Agent Kit plugin already ships a
+# stdio proxy that mints and refreshes one from Application Default
+# Credentials, and it accepts any https://*.googleapis.com/**/mcp target, so
+# this repository reuses it rather than implementing token refresh again.
+#
+# The catch is locating it. Both agents install the plugin under a directory
+# named for the plugin version, so the path cannot be committed to .mcp.json or
+# .codex/config.toml. Ask the agent instead, and let bin/mcp-dak-proxy exec
+# whatever comes back.
+# ---------------------------------------------------------------------------
+
+# Echoes Claude Code's copy of the proxy, or nothing when it cannot be found.
+workshop_claude_dak_proxy_path() {
+  local install_path
+
+  command -v claude >/dev/null 2>&1 || return 0
+
+  install_path="$(
+    claude plugin list --json 2>/dev/null |
+      dak_plugin="$DAK_PLUGIN" node -e '
+        let list = [];
+        try { list = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch (error) {}
+        if (!Array.isArray(list)) { list = []; }
+        const entry = list.find((p) => p && p.id === process.env.dak_plugin);
+        if (entry && entry.installPath) { console.log(entry.installPath); }
+      ' 2>/dev/null
+  )"
+
+  [[ -n "$install_path" ]] || return 0
+  printf '%s/%s' "$install_path" "$DAK_PROXY_RELATIVE_PATH"
+}
+
+# Echoes Codex's copy of the proxy, or nothing when it cannot be found.
+#
+# Codex reports a staging checkout under .tmp in the plugin's source.path, not
+# the installed copy, so that field is unusable here. The marketplace name,
+# plugin name and version it also reports do identify the installed directory,
+# so rebuild the path from those.
+workshop_codex_dak_proxy_path() {
+  local descriptor
+
+  command -v codex >/dev/null 2>&1 || return 0
+
+  descriptor="$(
+    codex plugin list --json 2>/dev/null |
+      dak_plugin="$DAK_PLUGIN" node -e '
+        let doc = {};
+        try { doc = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch (error) {}
+        const list = Array.isArray(doc.installed) ? doc.installed : [];
+        const entry = list.find((p) => p && p.pluginId === process.env.dak_plugin);
+        if (entry && entry.marketplaceName && entry.name && entry.version) {
+          console.log([entry.marketplaceName, entry.name, entry.version].join("/"));
+        }
+      ' 2>/dev/null
+  )"
+
+  [[ -n "$descriptor" ]] || return 0
+  printf '%s/plugins/cache/%s/%s' \
+    "${CODEX_HOME:-$HOME/.codex}" "$descriptor" "$DAK_PROXY_RELATIVE_PATH"
+}
+
+# Echoes the absolute path of an installed Data Agent Kit MCP proxy, or returns
+# non-zero when neither agent has one. Pass claude or codex to check a single
+# agent; pass nothing to accept whichever is installed.
+workshop_dak_proxy_path() {
+  local agent="${1:-}"
+  local candidate=''
+
+  case "$agent" in
+    claude) candidate="$(workshop_claude_dak_proxy_path)" ;;
+    codex) candidate="$(workshop_codex_dak_proxy_path)" ;;
+    *)
+      candidate="$(workshop_claude_dak_proxy_path)"
+      if [[ -z "$candidate" || ! -f "$candidate" ]]; then
+        candidate="$(workshop_codex_dak_proxy_path)"
+      fi
+      ;;
+  esac
+
+  [[ -n "$candidate" && -f "$candidate" ]] || return 1
+  printf '%s' "$candidate"
+}
+
+# Publishes the resolved proxy path for bin/mcp-dak-proxy to exec.
+#
+# A missing proxy is a warning rather than a failure. It costs the workshop the
+# Cloud Run exercise, which runs last, and there is no reason to block the rest
+# of the session over it.
+workshop_export_dak_proxy() {
+  local agent="${1:-}"
+  local proxy_path
+
+  if proxy_path="$(workshop_dak_proxy_path "$agent")"; then
+    export WORKSHOP_DAK_PROXY="$proxy_path"
+    return 0
+  fi
+
+  workshop_warn "Could not locate the Data Agent Kit MCP proxy."
+  workshop_hint "The Cloud Run MCP server will not start. Everything else is unaffected."
+  workshop_hint "Run ./bin/doctor to diagnose the Data Agent Kit installation."
+  return 0
+}
+
 # Common launcher preamble: resolve the saved project, scope the environment,
-# and load both workshop API keys. Sets WORKSHOP_PROJECT_ID on success.
+# load both workshop API keys, and publish the Data Agent Kit MCP proxy path.
+# Sets WORKSHOP_PROJECT_ID on success. Takes the agent being launched.
 #
 # Call this directly, never inside a command substitution: the exported
 # credentials would be confined to the subshell and lost.
 workshop_prepare_launch() {
+  local agent="${1:-}"
   local project_id
   project_id="$(workshop_saved_project)"
 
@@ -199,6 +308,7 @@ workshop_prepare_launch() {
   workshop_source_env_local
   workshop_load_secret_if_unset WORKSHOP_DK_API_KEY "$DK_SECRET_ID" "$project_id" || return 1
   workshop_load_secret_if_unset WORKSHOP_MAPS_API_KEY "$MAPS_SECRET_ID" "$project_id" || return 1
+  workshop_export_dak_proxy "$agent"
 
   WORKSHOP_PROJECT_ID="$project_id"
 }

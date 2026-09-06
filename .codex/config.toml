@@ -21,10 +21,44 @@ tool_timeout_sec = 60
 enabled = true
 required = false
 
+# Cloud Run takes no API key: bin/mcp-dak-proxy runs the Data Agent Kit's
+# bundled proxy, which authenticates with the attendee's own Application
+# Default Credentials. Codex does not expand environment variables inside args,
+# so the command is a repository-relative path and the launcher's working
+# directory is what resolves it. env_vars forwards the resolved proxy location;
+# without it the script falls back to resolving the path itself.
+#
+# The two read-only tools are approved automatically. The deploy tools are not:
+# they create and replace real services, and a prompt before that is worth the
+# few seconds it costs.
+[mcp_servers.cloud_run]
+command = "./bin/mcp-dak-proxy"
+args = ["https://run.googleapis.com/mcp"]
+env_vars = ["WORKSHOP_DAK_PROXY"]
+enabled_tools = [
+  "get_service",
+  "list_services",
+  "deploy_service_from_image",
+  "deploy_service_from_archive",
+  "deploy_service_from_file_contents",
+]
+startup_timeout_sec = 30
+# Deploys are slower than a metadata read; the default timeout cuts them off.
+tool_timeout_sec = 180
+enabled = true
+required = false
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.cloud_run.tools.get_service]
+approval_mode = "auto"
+
+[mcp_servers.cloud_run.tools.list_services]
+approval_mode = "auto"
+
 # The Data Agent Kit plugin includes MCP servers for many Google Cloud products.
 # This workshop uses only its hosted BigQuery and AlloyDB servers; disabling the
-# rest keeps the Codex tool context focused. Developer Knowledge and Maps above
-# are separate project-scoped servers and remain enabled.
+# rest keeps the Codex tool context focused. Developer Knowledge, Maps, and
+# Cloud Run above are separate project-scoped servers and remain enabled.
 [plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.bigquery]
 enabled = true
 
