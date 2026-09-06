@@ -79,97 +79,122 @@ Use the MCP tools for these checks. Make one successful read-only call to each s
 Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PASS.
 ```
 
-## Scenario prompts
+## Alder & Oak expansion scenario
 
-Paste one version of each prompt, one exercise at a time, in the same session. The
-short prompts are closer to what you might normally ask; the detailed prompts
-give the agent more constraints and specify the desired output.
+Alder & Oak Coffee operates six Austin stores and is choosing where to open
+next. Use these prompts as starting points. They build on one another, but each
+investigation can also stand on its own.
 
-### 1. Choose the right database
-
-Short:
+### Frame the decision
 
 ```text
-Why should Alder & Oak keep live inventory in AlloyDB and analytics in BigQuery?
-```
-
-Detailed:
-
-```text
-Using Google Developer Knowledge only, explain in no more than five bullets why live inventory belongs in AlloyDB while analytics belongs in BigQuery. Cite the official documents used. Do not inspect project data.
-```
-
-### 2. Find urgent inventory
-
-Short:
-
-```text
-Which store and product combinations most urgently need restocking, and what does local demand look like?
-```
-
-Detailed:
-
-```text
-Using read-only AlloyDB and BigQuery MCP tools, identify store and product pairs at or below their reorder threshold and enrich them with matching neighborhood demand from the mcp_retail BigQuery dataset. Use the configured project, us-central1, and existing mcp-retail-cluster. Do not use shell commands or modify data. Return the three most urgent rows and a two-sentence conclusion.
-```
-
-### 3. Corroborate customer complaints
-
-Short:
-
-```text
-Do customer reviews back up the inventory data about which products are running low?
-```
-
-Detailed:
-
-```text
-Using BigQuery MCP read-only queries, run AI.GENERATE over Alder & Oak rows in mcp_retail.customer_feedback to extract stock-availability complaints with structured store and product fields. Compare those results with live AlloyDB inventory using read-only MCP tools or the existing alloydb_retail_conn federation. Do not create tables or models, and do not use shell commands. Report which below-threshold inventory pairs are corroborated, plus matched and unmatched complaint counts.
-```
-
-### 4. Recommend a new location
-
-Short:
-
-```text
-Which candidate location should Alder & Oak choose for its next store based on forecast demand and rent?
-```
-
-Detailed:
-
-```text
-Using BigQuery MCP only, forecast 26 weeks of mcp_retail.market_demand by ZIP with AI.FORECAST, rank candidate_sites, and recommend one site. Do not create persistent resources, inspect repository files, or use shell commands. Return only the top three candidates with forecast demand, rent, and a concise rationale.
-```
-
-### 5. Check nearby competition
-
-Short:
-
-```text
-What are the five closest coffee competitors to Alder & Oak Coffee – East Austin (STR-002) at 1904 E Cesar Chavez St, Austin, TX 78702?
-```
-
-Detailed:
-
-```text
-Using Maps Grounding Lite only, find the five closest coffee sellers to Alder & Oak Coffee – East Austin (STR-002) at 1904 E Cesar Chavez St, Austin, TX 78702. Include each returned Google Maps source link immediately after that business. End with two sentences about competitive intensity. Do not search the web or inspect files.
-```
-
-### 6. Additional delivery and launch planning
-
-Run each prompt separately:
-
-```text
-Before we promote Guatemala Geisha beans on DoorDash, check whether we can actually fulfill delivery orders for it right now
+Alder & Oak wants to open a seventh Austin store. Help me make a recommendation we can defend. Before running any analysis, what evidence would you want, and where would you expect to find it?
 ```
 
 ```text
-Which residential buildings near SITE-002 are worth a launch-week promo?
+We keep live inventory in AlloyDB and analytical data in BigQuery. Challenge that design using official Google Cloud documentation, and cite the documents you use.
 ```
 
 ```text
-Which gyms and coworking spaces near SITE-002 should we partner with?
+How can we analyze those systems together without first building another ETL pipeline?
 ```
+
+### Investigate unmet demand
+
+```text
+Where is Alder & Oak currently failing to meet customer demand?
+```
+
+```text
+Can stock-movement history explain how those shortages developed?
+```
+
+```text
+Use BigQuery's built-in AI to structure the customer-review evidence. Does it independently corroborate the inventory data?
+```
+
+```text
+Can you combine the operational and analytical evidence in one analysis without copying the AlloyDB data into BigQuery first?
+```
+
+### Choose a new location
+
+```text
+What separates Alder & Oak's strongest store markets from its weakest ones?
+```
+
+```text
+Which candidate site should Alder & Oak choose, and how confident are you?
+```
+
+```text
+Forecast market demand for the candidate ZIP codes and translate it into plausible store revenue using capture rates from comparable stores. Account for rent in the recommendation.
+```
+
+```text
+What assumptions have the most influence on the ranking, and what would need to change for the runner-up to win?
+```
+
+### Test the recommendation in the real world
+
+```text
+Try to talk me out of your recommended site using what exists around it today.
+```
+
+```text
+Does nearby coffee competition indicate saturation, or does it validate demand?
+```
+
+```text
+Which nearby residential areas fall within a 10-minute driving radius from the site, as a proxy for DoorDash or Uber Eats delivery reach?
+```
+
+```text
+Which nearby residential buildings and neighborhood anchors are within a 10-minute walk of the site and could contribute launch-day foot traffic?
+```
+
+### Plan the launch
+
+```text
+Design a launch-week plan for the recommended site using everything we have learned.
+```
+
+```text
+If we held an outdoor launch event at the recommended site this weekend, what do the hourly and daily weather forecasts suggest, and how should we adjust the plan?
+```
+
+```text
+Which residential buildings near the site are worth a launch-week promotion?
+```
+
+```text
+Which nearby gyms and coworking spaces should we approach as launch partners?
+```
+
+```text
+Before we promote Guatemala Geisha beans on DoorDash, check whether we can actually fulfill delivery orders for it right now.
+```
+
+```text
+Revise the launch plan based on what you discovered.
+```
+
+### Share the decision
+
+```text
+Turn the analysis into an executive recommendation: one site, one runner-up, three launch actions, three major risks, and an evidence trail for every conclusion.
+```
+
+```text
+Build a simple read-only map dashboard that communicates the recommendation and lets someone inspect the supporting inventory, demand forecast, and nearby-place evidence.
+```
+
+```text
+Audit every number and label in the dashboard against the analysis, then deploy it to Cloud Run and return the live URL.
+```
+
+Cloud Run deployment creates or replaces a real service. Approve it only when
+you are ready to publish the dashboard.
 
 ## Uninstall
 
