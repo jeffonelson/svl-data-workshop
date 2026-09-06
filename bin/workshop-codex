@@ -7,12 +7,12 @@ source "$repo_root/bin/lib/workshop-common.sh"
 workshop_load_config
 
 if ! command -v codex >/dev/null 2>&1; then
-  echo "Missing required command: codex" >&2
+  workshop_error "Missing required command: codex"
   exit 1
 fi
 
 workshop_prepare_launch
-echo "Launching Codex for project: $WORKSHOP_PROJECT_ID"
+workshop_info "Launching Codex for project: $WORKSHOP_PROJECT_ID"
 
 cd "$repo_root"
 exec codex "$@"

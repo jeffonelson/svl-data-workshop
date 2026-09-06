@@ -4,12 +4,99 @@
 #
 # Nothing here may print, log, or persist an API-key value.
 
+# ---------------------------------------------------------------------------
+# Status output
+#
+# Color is a secondary channel only. Every message keeps its plain-text label,
+# so a piped log, a captured bug report, and a monochrome terminal all read
+# exactly the same as an attendee's screen. Color is suppressed when NO_COLOR
+# is set, when TERM is dumb, or when the destination stream is not a terminal.
+# ---------------------------------------------------------------------------
+
+WORKSHOP_SGR_RED=$'\033[0;31m'
+WORKSHOP_SGR_GREEN=$'\033[0;32m'
+WORKSHOP_SGR_YELLOW=$'\033[1;33m'
+WORKSHOP_SGR_CYAN=$'\033[0;36m'
+WORKSHOP_SGR_BOLD=$'\033[1m'
+WORKSHOP_SGR_RESET=$'\033[0m'
+
+# Colorability is decided per stream, because a piped stdout must not strip
+# color from the stderr the attendee is still reading in their terminal.
+workshop_stream_supports_color() {
+  [[ -z "${NO_COLOR:-}" ]] || return 1
+  [[ "${TERM:-}" != dumb ]] || return 1
+  [[ -t "$1" ]]
+}
+
+# Prints one message on the given file descriptor, coloring only the label.
+# Usage: workshop_print_status SGR LABEL FD MESSAGE
+#
+# Never call the printing helpers inside a command substitution: stdout is a
+# pipe there, so the terminal test would always fail and color would be lost.
+# Build the message first, then print it.
+workshop_print_status() {
+  local sgr="$1" label="$2" fd="$3" message="$4"
+  local start='' end=''
+
+  if [[ -n "$sgr" ]] && workshop_stream_supports_color "$fd"; then
+    start="$sgr"
+    end="$WORKSHOP_SGR_RESET"
+  fi
+
+  if [[ "$fd" == 2 ]]; then
+    printf '%s%s%s  %s\n' "$start" "$label" "$end" "$message" >&2
+  else
+    printf '%s%s%s  %s\n' "$start" "$label" "$end" "$message"
+  fi
+}
+
+# Prints a whole line in one color, for summaries that carry no label.
+# Usage: workshop_print_line SGR FD TEXT
+workshop_print_line() {
+  local sgr="$1" fd="$2" text="$3"
+  local start='' end=''
+
+  if [[ -n "$sgr" ]] && workshop_stream_supports_color "$fd"; then
+    start="$sgr"
+    end="$WORKSHOP_SGR_RESET"
+  fi
+
+  if [[ "$fd" == 2 ]]; then
+    printf '%s%s%s\n' "$start" "$text" "$end" >&2
+  else
+    printf '%s%s%s\n' "$start" "$text" "$end"
+  fi
+}
+
+# Procedure output, for scripts that narrate a sequence of steps. Progress
+# goes to stdout and problems go to stderr, so a caller can separate the
+# narration from what actually went wrong.
+#
+# bin/doctor deliberately does not use these: it reports a table of checks
+# rather than a procedure, so it defines its own PASS/FAIL/WARN labels on top
+# of workshop_print_status. The printing core is the part that must not drift,
+# not the choice of label.
+workshop_step() {
+  local number="$1" total="$2" title="$3"
+  echo
+  workshop_print_line "$WORKSHOP_SGR_CYAN$WORKSHOP_SGR_BOLD" 1 "[$number/$total] $title"
+}
+
+workshop_info()  { workshop_print_status "$WORKSHOP_SGR_CYAN$WORKSHOP_SGR_BOLD" '==>' 1 "$1"; }
+workshop_ok()    { workshop_print_status "$WORKSHOP_SGR_GREEN" '  ok' 1 "$1"; }
+workshop_warn()  { workshop_print_status "$WORKSHOP_SGR_YELLOW" '  !!' 2 "$1"; }
+workshop_error() { workshop_print_status "$WORKSHOP_SGR_RED" '  xx' 2 "$1"; }
+
+# A continuation line under a warning or error. It carries no label of its own
+# and lines up with the message column above it, so a remedy reads as part of
+# the problem rather than as a second, separate failure.
+workshop_hint()  { workshop_print_status '' '    ' 2 "$1"; }
+
 PROJECT_ID_PATTERN='^[a-z][a-z0-9-]{4,28}[a-z0-9]$'
 
 workshop_load_config() {
   # shellcheck source=../../config/workshop.env
   source "$repo_root/config/workshop.env"
-  export CLOUDSDK_METRICS_ENVIRONMENT="${CLOUDSDK_METRICS_ENVIRONMENT:+$CLOUDSDK_METRICS_ENVIRONMENT }datacloud.codex"
 }
 
 workshop_state_dir() {
@@ -64,7 +151,7 @@ workshop_load_secret_if_unset() {
   fi
 
   if ! command -v gcloud >/dev/null 2>&1; then
-    echo "Cannot load $variable_name: gcloud is not installed." >&2
+    workshop_error "Cannot load $variable_name: gcloud is not installed."
     return 1
   fi
 
@@ -73,13 +160,13 @@ workshop_load_secret_if_unset() {
       --secret="$secret_id" \
       --project="$project_id"
   )"; then
-    echo "Cannot load $variable_name from Secret Manager secret: $secret_id" >&2
-    echo "Run ./bin/doctor for authentication and IAM diagnostics." >&2
+    workshop_error "Cannot load $variable_name from Secret Manager secret: $secret_id"
+    workshop_hint "Run ./bin/doctor for authentication and IAM diagnostics."
     return 1
   fi
 
   if [[ -z "$secret_value" ]]; then
-    echo "Secret Manager returned an empty value for: $secret_id" >&2
+    workshop_error "Secret Manager returned an empty value for: $secret_id"
     return 1
   fi
 
@@ -98,13 +185,13 @@ workshop_prepare_launch() {
   project_id="$(workshop_saved_project)"
 
   if [[ -z "$project_id" ]]; then
-    echo "No workshop project is configured." >&2
-    echo "Run: ./bin/setup PROJECT_ID" >&2
+    workshop_error "No workshop project is configured."
+    workshop_hint "Run: ./bin/setup PROJECT_ID"
     return 1
   fi
 
   if ! workshop_project_id_is_valid "$project_id"; then
-    echo "The saved workshop project ID is invalid. Run: ./bin/setup PROJECT_ID" >&2
+    workshop_error "The saved workshop project ID is invalid. Run: ./bin/setup PROJECT_ID"
     return 1
   fi
 

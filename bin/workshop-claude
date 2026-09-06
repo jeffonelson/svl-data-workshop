@@ -7,12 +7,12 @@ source "$repo_root/bin/lib/workshop-common.sh"
 workshop_load_config
 
 if ! command -v claude >/dev/null 2>&1; then
-  echo "Missing required command: claude" >&2
+  workshop_error "Missing required command: claude"
   exit 1
 fi
 
 workshop_prepare_launch
-echo "Launching Claude Code for project: $WORKSHOP_PROJECT_ID"
+workshop_info "Launching Claude Code for project: $WORKSHOP_PROJECT_ID"
 
 # Claude Code has no equivalent of Codex's shell_environment_policy filters, so
 # WORKSHOP_DK_API_KEY and WORKSHOP_MAPS_API_KEY remain visible to shell commands

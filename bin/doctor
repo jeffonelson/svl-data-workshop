@@ -12,9 +12,12 @@ workshop_source_env_local
 failures=0
 warnings=0
 
-pass() { printf 'PASS  %s\n' "$1"; }
-fail() { printf 'FAIL  %s\n' "$1"; failures=$((failures + 1)); }
-warn() { printf 'WARN  %s\n' "$1"; warnings=$((warnings + 1)); }
+# A check report, not a procedure, so these use their own labels rather than
+# the shared workshop_info/ok/warn/error family. All three stay on stdout: the
+# report is one ordered stream an attendee can copy in full.
+pass() { workshop_print_status "$WORKSHOP_SGR_GREEN" 'PASS' 1 "$1"; }
+fail() { workshop_print_status "$WORKSHOP_SGR_RED" 'FAIL' 1 "$1"; failures=$((failures + 1)); }
+warn() { workshop_print_status "$WORKSHOP_SGR_YELLOW" 'WARN' 1 "$1"; warnings=$((warnings + 1)); }
 
 check_command() {
   if command -v "$1" >/dev/null 2>&1; then
@@ -227,5 +230,12 @@ if [[ "$has_claude" == true ]]; then
 fi
 
 echo
-printf 'Doctor finished with %d failure(s) and %d warning(s).\n' "$failures" "$warnings"
+printf -v summary 'Doctor finished with %d failure(s) and %d warning(s).' "$failures" "$warnings"
+if (( failures > 0 )); then
+  workshop_print_line "$WORKSHOP_SGR_RED" 1 "$summary"
+elif (( warnings > 0 )); then
+  workshop_print_line "$WORKSHOP_SGR_YELLOW" 1 "$summary"
+else
+  workshop_print_line "$WORKSHOP_SGR_GREEN" 1 "$summary"
+fi
 (( failures == 0 ))
