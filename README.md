@@ -79,9 +79,9 @@ Use the MCP tools for these checks. Make one successful read-only call to each s
 Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PASS.
 ```
 
-## Alder & Oak expansion scenario
+## Charlie's expansion scenario
 
-Alder & Oak Coffee operates six Austin stores and is choosing where to open
+Charlie's Coffee operates six Austin stores and is choosing where to open
 next. Each section has one featured prompt. Run the featured prompts for the
 shortest path through the scenario, then choose any optional follow-ups that
 match your interests and available time. Continue in the same agent session so
@@ -104,7 +104,7 @@ How can we analyze AlloyDB and BigQuery together without first building another 
 ```
 
 ```text
-Alder & Oak wants to open a seventh Austin store. Help me make a recommendation we can defend. Before running any analysis, what evidence would you want, and where would you expect to find it?
+Charlie's wants to open a seventh Austin store. Help me make a recommendation we can defend. Before running any analysis, what evidence would you want, and where would you expect to find it?
 ```
 
 ### Investigate unmet demand
@@ -112,7 +112,7 @@ Alder & Oak wants to open a seventh Austin store. Help me make a recommendation 
 #### Featured prompt
 
 ```text
-Where is Alder & Oak currently failing to meet customer demand?
+Where is Charlie's currently failing to meet customer demand?
 ```
 
 #### Optional follow-ups
@@ -142,11 +142,11 @@ rates, account for rent, and recommend one site.
 #### Optional follow-ups
 
 ```text
-What separates Alder & Oak's strongest store markets from its weakest ones?
+What separates Charlie's strongest store markets from its weakest ones?
 ```
 
 ```text
-Which candidate site should Alder & Oak choose, and how confident are you?
+Which candidate site should Charlie's choose, and how confident are you?
 ```
 
 ```text
