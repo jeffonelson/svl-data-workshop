@@ -82,35 +82,47 @@ Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PA
 ## Alder & Oak expansion scenario
 
 Alder & Oak Coffee operates six Austin stores and is choosing where to open
-next. Use these prompts as starting points. They build on one another, but each
-investigation can also stand on its own.
+next. Each section has one featured prompt. Run the featured prompts for the
+shortest path through the scenario, then choose any optional follow-ups that
+match your interests and available time. Continue in the same agent session so
+later prompts can build on earlier findings.
 
 ### Frame the decision
+
+#### Featured prompt
+
+```text
+According to the official Google Cloud documentation, why might AlloyDB be a
+better home for live inventory than BigQuery, and when would that choice stop
+making sense?
+```
+
+#### Optional follow-ups
+
+```text
+How can we analyze AlloyDB and BigQuery together without first building another ETL pipeline? Use the official Google Cloud documentation and cite the documents you use.
+```
 
 ```text
 Alder & Oak wants to open a seventh Austin store. Help me make a recommendation we can defend. Before running any analysis, what evidence would you want, and where would you expect to find it?
 ```
 
-```text
-We keep live inventory in AlloyDB and analytical data in BigQuery. Challenge that design using official Google Cloud documentation, and cite the documents you use.
-```
-
-```text
-How can we analyze those systems together without first building another ETL pipeline?
-```
-
 ### Investigate unmet demand
+
+#### Featured prompt
 
 ```text
 Where is Alder & Oak currently failing to meet customer demand?
 ```
+
+#### Optional follow-ups
 
 ```text
 Can stock-movement history explain how those shortages developed?
 ```
 
 ```text
-Use BigQuery's built-in AI to structure the customer-review evidence. Does it independently corroborate the inventory data?
+Use BigQuery AI to structure the customer-review evidence. Does it independently corroborate the inventory data?
 ```
 
 ```text
@@ -118,6 +130,16 @@ Can you combine the operational and analytical evidence in one analysis without 
 ```
 
 ### Choose a new location
+
+#### Featured prompt
+
+```text
+Use BigQuery AI.FORECAST to forecast market demand for the candidate ZIP codes,
+then translate it into plausible store revenue using comparable-store capture
+rates, account for rent, and recommend one site.
+```
+
+#### Optional follow-ups
 
 ```text
 What separates Alder & Oak's strongest store markets from its weakest ones?
@@ -128,18 +150,20 @@ Which candidate site should Alder & Oak choose, and how confident are you?
 ```
 
 ```text
-Forecast market demand for the candidate ZIP codes and translate it into plausible store revenue using capture rates from comparable stores. Account for rent in the recommendation.
-```
-
-```text
 What assumptions have the most influence on the ranking, and what would need to change for the runner-up to win?
 ```
 
 ### Test the recommendation in the real world
 
+#### Featured prompt
+
 ```text
-Try to talk me out of your recommended site using what exists around it today.
+Stress-test your recommended site using what exists around it today. What
+real-world evidence strengthens or weakens the recommendation? Include the
+Google Maps source link immediately after every place-based claim.
 ```
+
+#### Optional follow-ups
 
 ```text
 Does nearby coffee competition indicate saturation, or does it validate demand?
@@ -155,9 +179,13 @@ Which nearby residential buildings and neighborhood anchors are within a 10-minu
 
 ### Plan the launch
 
+#### Featured prompt
+
 ```text
 Design a launch-week plan for the recommended site using everything we have learned.
 ```
+
+#### Optional follow-ups
 
 ```text
 If we held an outdoor launch event at the recommended site this weekend, what do the hourly and daily weather forecasts suggest, and how should we adjust the plan?
@@ -172,7 +200,7 @@ Which nearby gyms and coworking spaces should we approach as launch partners?
 ```
 
 ```text
-Before we promote Guatemala Geisha beans on DoorDash, check whether we can actually fulfill delivery orders for it right now.
+Before we promote Guatemala Geisha beans on DoorDash, identify the store that would fulfill those orders and check whether it can fulfill them right now.
 ```
 
 ```text
@@ -181,12 +209,16 @@ Revise the launch plan based on what you discovered.
 
 ### Share the decision
 
+#### Featured prompt
+
 ```text
 Turn the analysis into an executive recommendation: one site, one runner-up, three launch actions, three major risks, and an evidence trail for every conclusion.
 ```
 
+#### Optional follow-ups
+
 ```text
-Build a simple read-only map dashboard that communicates the recommendation and lets someone inspect the supporting inventory, demand forecast, and nearby-place evidence.
+Build a simple read-only map dashboard that communicates the recommendation and lets someone inspect the supporting inventory, TimesFM demand forecast, and nearby-place evidence.
 ```
 
 ```text
