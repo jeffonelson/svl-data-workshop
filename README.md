@@ -34,8 +34,10 @@ and configures the Data Agent Kit plugin for each supported agent on your comput
 ./bin/setup <INSERT_YOUR_GOOGLE_CLOUD_PROJECT_ID>
 ```
 
-`./bin/doctor` runs read-only checks for the required software, Google Cloud
-authentication, plugin installation, and MCP configuration.
+Before running doctor, sign in to your chosen CLI if needed: `codex login` or `claude auth login`.
+
+`./bin/doctor` runs read-only checks for the required software, agent CLI login,
+Google Cloud authentication, plugin installation, and MCP configuration.
 
 ```bash
 ./bin/doctor

@@ -53,15 +53,15 @@ else
   fail "no valid workshop project is configured; run: ./bin/setup PROJECT_ID"
 fi
 
-if command -v gcloud >/dev/null 2>&1; then
-  active_account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
+if command -v gcloud >/dev/null 2>&1 && [[ -n "${GCP_PROJECT_ID:-}" ]]; then
+  active_account="$(gcloud auth list --project="$GCP_PROJECT_ID" --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
   if [[ -n "$active_account" ]]; then
     pass "gcloud has an active account ($active_account)"
   else
     fail "gcloud has no active account; run: gcloud auth login"
   fi
 
-  if gcloud auth application-default print-access-token >/dev/null 2>&1; then
+  if gcloud auth application-default print-access-token --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
     pass "Application Default Credentials are available"
   else
     fail "ADC is unavailable; run: gcloud auth application-default login"
@@ -100,32 +100,39 @@ check_secret_source() {
 check_secret_source WORKSHOP_DK_API_KEY "$DK_SECRET_ID"
 check_secret_source WORKSHOP_MAPS_API_KEY "$MAPS_SECRET_ID"
 
-if [[ "$has_codex" == true ]]; then
-  plugins_json="$(codex plugin list --json 2>/dev/null)"
-  if grep -Fq "\"pluginId\": \"$DAK_PLUGIN\"" <<<"$plugins_json"; then
+# Use only the CLI's status command and its exit code. Discard both output
+# streams: status can include account details or an API-key preview. Do not
+# inspect credential files or start an interactive login from doctor.
+check_agent_login() {
+  local label="$1" login_command="$2"
+  shift 2
+  if "$@" </dev/null >/dev/null 2>&1; then
+    pass "$label: CLI reports a configured login"
+    return 0
+  fi
+  warn "$label: CLI login could not be confirmed; plugin/MCP checks skipped"
+  echo "      Sign in with '$login_command' if needed, then rerun ./bin/doctor."
+  echo "      If already signed in, check the CLI's login status and version."
+  return 1
+}
+
+if [[ "$has_codex" == true ]] && check_agent_login Codex 'codex login' codex login status; then
+  if ! plugin_entry="$(workshop_agent_entry codex plugin)"; then
+    fail "Codex: could not read the installed plugin list"
+  elif [[ "$plugin_entry" != null ]]; then
     pass "Codex: Data Agent Kit plugin is installed"
   else
     fail "Codex: Data Agent Kit plugin is not installed; run: ./bin/setup"
   fi
 
   mcp_json="$(cd "$repo_root" && codex mcp list --json 2>/dev/null)"
-  if grep -Fq 'google_developer_knowledge' <<<"$mcp_json"; then
-    pass "Codex: Developer Knowledge MCP configuration is visible"
-  else
-    warn "Codex: Developer Knowledge MCP is not visible; trust the project and restart Codex"
-  fi
-
-  if grep -Fq 'maps_grounding_lite' <<<"$mcp_json"; then
-    pass "Codex: Maps Grounding Lite MCP configuration is visible"
-  else
-    warn "Codex: Maps Grounding Lite MCP is not visible; trust the project and restart Codex"
-  fi
-
-  if grep -Fq 'cloud_run' <<<"$mcp_json"; then
-    pass "Codex: Cloud Run MCP configuration is visible"
-  else
-    warn "Codex: Cloud Run MCP is not visible; trust the project and restart Codex"
-  fi
+  for server in google_developer_knowledge maps_grounding_lite cloud_run; do
+    if grep -Fq "$server" <<<"$mcp_json"; then
+      pass "Codex: $server MCP configuration is visible"
+    else
+      warn "Codex: $server MCP is not visible; trust the project and restart Codex"
+    fi
+  done
 
   if codex_proxy="$(workshop_dak_proxy_path codex)"; then
     pass "Codex: Data Agent Kit MCP proxy found ($codex_proxy)"
@@ -134,19 +141,15 @@ if [[ "$has_codex" == true ]]; then
   fi
 fi
 
-if [[ "$has_claude" == true ]]; then
+if [[ "$has_claude" == true ]] && check_agent_login 'Claude Code' 'claude auth login' claude auth status; then
   # Check what is actually installed rather than what setup declared, so a
   # failed or partial install cannot report as healthy.
-  claude_marketplace_json="$(claude plugin marketplace list --json 2>/dev/null || printf '[]')"
   claude_marketplace_ref="$(
-    dak_marketplace="$DAK_MARKETPLACE" \
-    node -e '
-      let list = [];
-      try { list = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch (error) {}
-      const entry = list.find((m) => m && m.name === process.env.dak_marketplace);
+    workshop_agent_entry claude marketplace | node -e '
+      const entry = JSON.parse(require("fs").readFileSync(0, "utf8"));
       if (!entry) { console.log("__MISSING__"); }
       else { console.log(entry.ref || "__DEFAULT_BRANCH__"); }
-    ' <<<"$claude_marketplace_json" 2>/dev/null
+    ' 2>/dev/null
   )"
 
   if [[ "$claude_marketplace_ref" == "__MISSING__" || -z "$claude_marketplace_ref" ]]; then
@@ -163,16 +166,11 @@ if [[ "$has_claude" == true ]]; then
     fail "Claude Code: marketplace ref is $claude_marketplace_ref; config/workshop.env expects $DAK_REF"
   fi
 
-  claude_plugins_json="$(claude plugin list --json 2>/dev/null || printf '[]')"
   claude_plugin_report="$(
-    dak_plugin="$DAK_PLUGIN" \
-    dak_project_id="${GCP_PROJECT_ID:-}" \
-    node -e '
+    workshop_agent_entry claude plugin | dak_plugin="$DAK_PLUGIN" node -e '
       const fs = require("fs");
-      let list = [];
-      try { list = JSON.parse(fs.readFileSync(0, "utf8")); } catch (error) {}
+      const entry = JSON.parse(fs.readFileSync(0, "utf8"));
       const plugin = process.env.dak_plugin;
-      const entry = list.find((p) => p && p.id === plugin);
       if (!entry) {
         console.log("FAIL plugin " + plugin + " is not installed; run: ./bin/setup PROJECT_ID");
       } else {
@@ -191,7 +189,7 @@ if [[ "$has_claude" == true ]]; then
           console.log("WARN plugin declares no MCP servers");
         }
       }
-    ' <<<"$claude_plugins_json" 2>/dev/null
+    ' 2>/dev/null
   )"
 
   if [[ -z "$claude_plugin_report" ]]; then
@@ -267,7 +265,7 @@ check_cloud_run_mcp() {
     fi
   done
 
-  if ! token="$(gcloud auth application-default print-access-token 2>/dev/null)" ||
+  if ! token="$(gcloud auth application-default print-access-token --project="$GCP_PROJECT_ID" 2>/dev/null)" ||
     [[ -z "$token" ]]; then
     fail "Cloud Run MCP: no ADC access token; run: gcloud auth application-default login"
     return
@@ -279,13 +277,17 @@ check_cloud_run_mcp() {
 
   # The access token is written to curl's stdin config, never passed as an
   # argument, so it cannot appear in a process listing.
-  response="$(
+  if ! response="$(
     printf 'header = "Authorization: Bearer %s"\n' "$token" |
-      curl --silent --max-time 30 --config - \
+      curl --fail --silent --max-time 30 --config - \
         --header 'Content-Type: application/json' \
         --request POST "$CLOUD_RUN_MCP_URL" \
         --data "$request" 2>/dev/null
-  )"
+  )"; then
+    unset token
+    fail "Cloud Run MCP: request failed; check connectivity and project IAM permissions"
+    return
+  fi
   unset token
 
   if [[ -z "$response" ]]; then
@@ -300,16 +302,25 @@ check_cloud_run_mcp() {
         console.log("FAIL the server returned a non-JSON response");
         process.exit(0);
       }
-      const result = doc.result || {};
-      const text = (result.content || [])
+      const result = doc && doc.result;
+      if (doc && doc.error) {
+        console.log("FAIL " + (doc.error.message || "the server returned an error"));
+        process.exit(0);
+      }
+      if (!doc || doc.jsonrpc !== "2.0" || doc.id !== 1 ||
+          !result || !Array.isArray(result.content)) {
+        console.log("FAIL the server returned an error or an invalid tool response");
+        process.exit(0);
+      }
+      const text = result.content
         .map((part) => (part && part.text) || "")
         .join(" ")
         .replace(/\s+/g, " ")
         .trim();
-      if (doc.error) {
-        console.log("FAIL " + (doc.error.message || "the server returned an error"));
-      } else if (result.isError) {
+      if (result.isError) {
         console.log("FAIL " + (text || "the tool call was rejected"));
+      } else if (!text && !result.structuredContent) {
+        console.log("FAIL the tool returned no result content");
       } else {
         console.log("PASS list_services answered for this project");
       }

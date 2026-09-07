@@ -190,76 +190,61 @@ workshop_load_secret_if_unset() {
 # whatever comes back.
 # ---------------------------------------------------------------------------
 
-# Echoes Claude Code's copy of the proxy, or nothing when it cannot be found.
-workshop_claude_dak_proxy_path() {
-  local install_path
+# Return the workshop plugin or marketplace entry as JSON, or null if absent.
+# A failed command or malformed listing is an error, never permission to install
+# again. Both agents share this parser; their CLI commands remain explicit.
+workshop_agent_entry() {
+  local agent="$1" kind="$2" listing
+  local args=(plugin)
+  [[ "$kind" != marketplace ]] || args+=(marketplace)
 
-  command -v claude >/dev/null 2>&1 || return 0
+  if ! listing="$("$agent" "${args[@]}" list --json 2>/dev/null)"; then
+    workshop_error "Cannot list $agent ${kind}s; check '$agent plugin' and retry."
+    return 1
+  fi
 
-  install_path="$(
-    claude plugin list --json 2>/dev/null |
-      dak_plugin="$DAK_PLUGIN" node -e '
-        let list = [];
-        try { list = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch (error) {}
-        if (!Array.isArray(list)) { list = []; }
-        const entry = list.find((p) => p && p.id === process.env.dak_plugin);
-        if (entry && entry.installPath) { console.log(entry.installPath); }
-      ' 2>/dev/null
-  )"
-
-  [[ -n "$install_path" ]] || return 0
-  printf '%s/%s' "$install_path" "$DAK_PROXY_RELATIVE_PATH"
-}
-
-# Echoes Codex's copy of the proxy, or nothing when it cannot be found.
-#
-# Codex reports a staging checkout under .tmp in the plugin's source.path, not
-# the installed copy, so that field is unusable here. The marketplace name,
-# plugin name and version it also reports do identify the installed directory,
-# so rebuild the path from those.
-workshop_codex_dak_proxy_path() {
-  local descriptor
-
-  command -v codex >/dev/null 2>&1 || return 0
-
-  descriptor="$(
-    codex plugin list --json 2>/dev/null |
-      dak_plugin="$DAK_PLUGIN" node -e '
-        let doc = {};
-        try { doc = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch (error) {}
-        const list = Array.isArray(doc.installed) ? doc.installed : [];
-        const entry = list.find((p) => p && p.pluginId === process.env.dak_plugin);
-        if (entry && entry.marketplaceName && entry.name && entry.version) {
-          console.log([entry.marketplaceName, entry.name, entry.version].join("/"));
-        }
-      ' 2>/dev/null
-  )"
-
-  [[ -n "$descriptor" ]] || return 0
-  printf '%s/plugins/cache/%s/%s' \
-    "${CODEX_HOME:-$HOME/.codex}" "$descriptor" "$DAK_PROXY_RELATIVE_PATH"
+  node -e '
+    const [agent, kind, plugin, marketplace] = process.argv.slice(1);
+    try {
+      const doc = JSON.parse(require("fs").readFileSync(0, "utf8"));
+      const list = agent === "codex"
+        ? doc[kind === "plugin" ? "installed" : "marketplaces"] : doc;
+      if (!Array.isArray(list)) throw new Error("invalid listing");
+      const key = kind === "marketplace" ? "name" : agent === "codex" ? "pluginId" : "id";
+      const id = kind === "marketplace" ? marketplace : plugin;
+      console.log(JSON.stringify(list.find((entry) => entry && entry[key] === id) || null));
+    } catch (error) {
+      console.error("Cannot read " + agent + " " + kind + " listing; check the CLI and retry.");
+      process.exit(1);
+    }
+  ' "$agent" "$kind" "$DAK_PLUGIN" "$DAK_MARKETPLACE" <<<"$listing"
 }
 
 # Echoes the absolute path of an installed Data Agent Kit MCP proxy, or returns
 # non-zero when neither agent has one. Pass claude or codex to check a single
 # agent; pass nothing to accept whichever is installed.
 workshop_dak_proxy_path() {
-  local agent="${1:-}"
-  local candidate=''
-
-  case "$agent" in
-    claude) candidate="$(workshop_claude_dak_proxy_path)" ;;
-    codex) candidate="$(workshop_codex_dak_proxy_path)" ;;
-    *)
-      candidate="$(workshop_claude_dak_proxy_path)"
-      if [[ -z "$candidate" || ! -f "$candidate" ]]; then
-        candidate="$(workshop_codex_dak_proxy_path)"
-      fi
-      ;;
-  esac
-
-  [[ -n "$candidate" && -f "$candidate" ]] || return 1
-  printf '%s' "$candidate"
+  local agent entry candidate
+  for agent in ${1:-claude codex}; do
+    command -v "$agent" >/dev/null 2>&1 || continue
+    entry="$(workshop_agent_entry "$agent" plugin)" || continue
+    candidate="$(node -e '
+      const [agent, codexHome, suffix] = process.argv.slice(1);
+      const entry = JSON.parse(require("fs").readFileSync(0, "utf8"));
+      if (!entry) process.exit(0);
+      // Codex source.path is a staging checkout; rebuild the installed path.
+      const root = agent === "codex"
+        ? entry.marketplaceName && entry.name && entry.version &&
+          [codexHome, "plugins/cache", entry.marketplaceName, entry.name, entry.version].join("/")
+        : entry.installPath;
+      if (root) console.log(root + "/" + suffix);
+    ' "$agent" "${CODEX_HOME:-$HOME/.codex}" "$DAK_PROXY_RELATIVE_PATH" <<<"$entry")" || continue
+    if [[ -n "$candidate" && -f "$candidate" ]]; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  return 1
 }
 
 # Publishes the resolved proxy path for bin/mcp-dak-proxy to exec.

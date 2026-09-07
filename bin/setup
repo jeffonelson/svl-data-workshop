@@ -60,19 +60,19 @@ if [[ "$has_codex" == false && "$has_claude" == false ]]; then
 fi
 
 workshop_info "Checking Google Cloud CLI authentication..."
-active_account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
+active_account="$(gcloud auth list --project="$GCP_PROJECT_ID" --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
 if [[ -z "$active_account" ]]; then
   workshop_error "No active gcloud account. Run: gcloud auth login"
   exit 1
 fi
 
-if ! gcloud auth application-default print-access-token >/dev/null 2>&1; then
+if ! gcloud auth application-default print-access-token --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
   workshop_error "Application Default Credentials are unavailable."
   workshop_hint "Run: gcloud auth application-default login"
   exit 1
 fi
 
-if ! gcloud projects describe "$GCP_PROJECT_ID" >/dev/null 2>&1; then
+if ! gcloud projects describe "$GCP_PROJECT_ID" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
   workshop_error "The active account cannot access project: $GCP_PROJECT_ID"
   workshop_hint "Check project IAM and the active gcloud account."
   exit 1
@@ -97,8 +97,8 @@ if [[ "$has_codex" == true ]]; then
   echo
   workshop_info "Configuring Codex..."
 
-  marketplaces_json="$(codex plugin marketplace list --json)"
-  if grep -Fq "\"name\": \"$DAK_MARKETPLACE\"" <<<"$marketplaces_json"; then
+  marketplace_entry="$(workshop_agent_entry codex marketplace)"
+  if [[ "$marketplace_entry" != null ]]; then
     workshop_ok "Marketplace already configured: $DAK_MARKETPLACE"
   else
     # Codex takes the ref as a flag; Claude Code takes it as a URL fragment
@@ -114,8 +114,8 @@ if [[ "$has_codex" == true ]]; then
     touch "$state_dir/marketplace-added-by-workshop"
   fi
 
-  plugins_json="$(codex plugin list --json)"
-  if grep -Fq "\"pluginId\": \"$DAK_PLUGIN\"" <<<"$plugins_json"; then
+  plugin_entry="$(workshop_agent_entry codex plugin)"
+  if [[ "$plugin_entry" != null ]]; then
     workshop_ok "Plugin already installed: $DAK_PLUGIN"
   else
     workshop_info "Installing Data Agent Kit plugin..."
@@ -131,13 +131,11 @@ if [[ "$has_claude" == true ]]; then
   # Installed at user scope, matching how Claude Code plugins are normally
   # installed. The plugin is therefore enabled in every project the attendee
   # opens until ./bin/teardown runs.
-  claude_marketplaces_json="$(claude plugin marketplace list --json 2>/dev/null || printf '[]')"
-  if grep -Fq "\"name\": \"$DAK_MARKETPLACE\"" <<<"$claude_marketplaces_json"; then
+  marketplace_entry="$(workshop_agent_entry claude marketplace)"
+  if [[ "$marketplace_entry" != null ]]; then
     workshop_ok "Marketplace already configured: $DAK_MARKETPLACE"
   else
-    # A git URL fragment pins the marketplace ref. Drop DAK_REF from
-    # config/workshop.env once the Data Agent Kit release lands on the default
-    # branch, and this becomes a plain repository URL.
+    # Claude Code takes the ref as a git URL fragment.
     dak_marketplace_source="$DAK_REPOSITORY.git"
     if [[ -n "${DAK_REF:-}" ]]; then
       workshop_info "Adding Data Agent Kit marketplace at ref: $DAK_REF"
@@ -149,8 +147,8 @@ if [[ "$has_claude" == true ]]; then
     touch "$state_dir/claude-marketplace-added-by-workshop"
   fi
 
-  claude_plugins_json="$(claude plugin list --json 2>/dev/null || printf '[]')"
-  if grep -Fq "\"id\": \"$DAK_PLUGIN\"" <<<"$claude_plugins_json"; then
+  plugin_entry="$(workshop_agent_entry claude plugin)"
+  if [[ "$plugin_entry" != null ]]; then
     workshop_ok "Plugin already installed: $DAK_PLUGIN"
   else
     workshop_info "Installing Data Agent Kit plugin..."
