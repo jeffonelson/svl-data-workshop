@@ -81,9 +81,19 @@ Use the MCP tools for these checks. Make one successful read-only call to each s
 Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PASS.
 ```
 
+## Data landscape
+
+[Open the workshop data map](https://jeffonelson.github.io/svl-data-workshop/data-landscape.html)
+for a concise view of the tables, their grain, and the relationships between them.
+
 ## Charlie's expansion scenario
 
-Charlie's Coffee operates six Austin stores and is choosing where to open
+This is a fictional business case. Sales, demographics, traffic, rents, store
+locations, property availability and all reviews are synthetic. Competitor
+names refer to real businesses; use live Maps evidence to test the scenario.
+Store and candidate pins represent illustrative street blocks, not real listings.
+
+Charlie's Coffee operates six San Francisco stores and is choosing where to open
 next. Each section has one featured prompt. Run the featured prompts for the
 shortest path through the scenario, then choose any optional follow-ups that
 match your interests and available time. Continue in the same agent session so
@@ -106,7 +116,7 @@ How can we analyze AlloyDB and BigQuery together without first building another 
 ```
 
 ```text
-Charlie's wants to open a seventh Austin store. Help me make a recommendation we can defend. Before running any analysis, what evidence would you want, and where would you expect to find it?
+Charlie's wants to open a seventh San Francisco store. Help me make a recommendation we can defend. Before running any analysis, what evidence would you want, and where would you expect to find it?
 ```
 
 ### Investigate unmet demand
