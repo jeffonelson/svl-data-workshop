@@ -63,11 +63,6 @@ Trust the repository when prompted. Keep this session open for the entire lab.
 First, run `/mcp` in the agent and confirm that the Developer Knowledge, Maps
 Grounding Lite, Cloud Run, BigQuery, and AlloyDB MCP servers are loaded.
 
-Cloud Run is the one server here that needs no API key: it acts as you, using
-the Google Cloud credentials you logged in with. Seeing it listed is not proof
-that it works, because it lists its tools without checking credentials at all.
-`./bin/doctor` makes a real call to it, so trust the doctor over the list.
-
 Then paste the following prompt into the same agent session and run it:
 
 ```text
@@ -88,16 +83,10 @@ for a concise view of the tables, their grain, and the relationships between the
 
 ## Charlie's expansion scenario
 
-This is a fictional business case. Sales, demographics, traffic, rents, store
-locations, property availability and all reviews are synthetic. Competitor
-names refer to real businesses; use live Maps evidence to test the scenario.
-Store and candidate pins represent illustrative street blocks, not real listings.
-
 Charlie's Coffee operates six San Francisco stores and is choosing where to open
-next. Each section has one featured prompt. Run the featured prompts for the
-shortest path through the scenario, then choose any optional follow-ups that
-match your interests and available time. Continue in the same agent session so
-later prompts can build on earlier findings.
+next. Run the featured prompts for the shortest path through the scenario, then
+choose any optional follow-ups that match your interests and available time.
+Continue in the same agent session so later prompts can build on earlier findings.
 
 ### Frame the decision
 
