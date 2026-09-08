@@ -205,7 +205,7 @@ Does nearby coffee competition indicate saturation, or does it validate demand?
 ```
 
 ```text
-Use Maps to find nearby residential areas and check their driving times from the site.
+Which nearby residential areas could expand Charlie’s delivery reach through DoorDash or Uber Eats? Use Maps to compare driving times from the site.
 ```
 
 ```text
