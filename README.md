@@ -78,8 +78,10 @@ Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PA
 
 ## Data landscape
 
-[Open the workshop data map](https://jeffonelson.github.io/svl-data-workshop/data-landscape.html)
-for a concise view of the tables, their grain, and the relationships between them.
+[![Preview of Charlie's Coffee data landscape](assets/data-landscape-preview.png)](https://jeffonelson.github.io/svl-data-workshop/data-landscape.html)
+
+[Open the interactive data landscape](https://jeffonelson.github.io/svl-data-workshop/data-landscape.html)
+to explore the tables, their grain, and the relationships between them.
 
 ## Charlie's expansion scenario
 
@@ -113,7 +115,7 @@ Charlie's wants to open a seventh San Francisco store. Help me make a recommenda
 #### Featured prompt
 
 ```text
-Where is Charlie's currently failing to meet customer demand?
+Where is Charlie's inventory failing to meet customer demand?
 ```
 
 #### Optional follow-ups
@@ -122,12 +124,23 @@ Where is Charlie's currently failing to meet customer demand?
 Can stock-movement history explain how those shortages developed?
 ```
 
+### Check the customer evidence
+
+#### Featured prompt
+
 ```text
-Use BigQuery AI to structure the customer-review evidence. Does it independently corroborate the inventory data?
+Use BigQuery AI to extract availability complaints from customer reviews.
+Do they corroborate the live inventory?
 ```
+
+#### Optional follow-ups
 
 ```text
 Can you combine the operational and analytical evidence in one analysis without copying the AlloyDB data into BigQuery first?
+```
+
+```text
+Which complaints match specific store/product pairs, and which are ambiguous?
 ```
 
 ### Choose a new location
@@ -135,9 +148,8 @@ Can you combine the operational and analytical evidence in one analysis without 
 #### Featured prompt
 
 ```text
-Use BigQuery AI.FORECAST to forecast market demand for the candidate ZIP codes,
-then translate it into plausible store revenue using comparable-store capture
-rates, account for rent, and recommend one site.
+Use BigQuery AI.FORECAST to forecast six months of candidate-market demand.
+Which site looks best after estimating store revenue and accounting for rent?
 ```
 
 #### Optional follow-ups
@@ -147,11 +159,33 @@ What separates Charlie's strongest store markets from its weakest ones?
 ```
 
 ```text
-Which candidate site should Charlie's choose, and how confident are you?
+How did you translate market demand into store revenue? Check your assumptions
+against Charlie's existing stores.
 ```
 
 ```text
 What assumptions have the most influence on the ranking, and what would need to change for the runner-up to win?
+```
+
+### Make it local (optional)
+
+Want to explore somewhere you know? Bring Charlie's to your own spot. Replace
+`[LOCATION]` with anywhere in the world you'd like to explore; include the country
+if the name could be ambiguous. San Francisco's numbers remain business benchmarks.
+Skip this section to continue with your San Francisco recommendation.
+
+#### Featured prompt
+
+```text
+What if Charlie's expanded into [LOCATION]? Use Maps to suggest three areas
+worth exploring, informed by what we learned from its San Francisco stores.
+```
+
+#### Follow-up
+
+```text
+Which area looks most promising, and what would we need to verify?
+Pick a specific map anchor for a hypothetical store to explore next.
 ```
 
 ### Test the recommendation in the real world
@@ -159,9 +193,9 @@ What assumptions have the most influence on the ranking, and what would need to 
 #### Featured prompt
 
 ```text
-Stress-test your recommended site using what exists around it today. What
-real-world evidence strengthens or weakens the recommendation? Include the
-Google Maps source link immediately after every place-based claim.
+Use Maps to stress-test your recommended SF expansion spot. What nearby evidence
+strengthens or weakens the case? Include the Google Maps source link
+immediately after every place-based claim.
 ```
 
 #### Optional follow-ups
@@ -171,7 +205,7 @@ Does nearby coffee competition indicate saturation, or does it validate demand?
 ```
 
 ```text
-Which nearby residential areas fall within a 10-minute driving radius from the site, as a proxy for DoorDash or Uber Eats delivery reach?
+Use Maps to find nearby residential areas and check their driving times from the site.
 ```
 
 ```text
@@ -193,41 +227,36 @@ If we held an outdoor launch event at the recommended site this weekend, what do
 ```
 
 ```text
-Which residential buildings near the site are worth a launch-week promotion?
-```
-
-```text
 Which nearby gyms and coworking spaces should we approach as launch partners?
 ```
 
 ```text
-Before we promote Guatemala Geisha beans on DoorDash, identify the store that would fulfill those orders and check whether it can fulfill them right now.
+What stock problems should we avoid repeating at launch?
 ```
 
 ```text
 Revise the launch plan based on what you discovered.
 ```
 
-### Share the decision
+### Visualize and share (optional)
 
 #### Featured prompt
 
 ```text
-Turn the analysis into an executive recommendation: one site, one runner-up, three launch actions, three major risks, and an evidence trail for every conclusion.
+Build an interactive BI dashboard that helps our team explore Charlie's sales,
+inventory, and market demand. Highlight the most interesting findings.
 ```
 
 #### Optional follow-ups
 
 ```text
-Build a simple read-only map dashboard that communicates the recommendation and lets someone inspect the supporting inventory, TimesFM demand forecast, and nearby-place evidence.
+Audit the dashboard's numbers and labels against the source data.
 ```
 
 ```text
-Audit every number and label in the dashboard against the analysis, then deploy it to Cloud Run and return the live URL.
+Deploy the dashboard to Cloud Run so our team can revisit it. Return the live URL.
 ```
 
-Cloud Run deployment creates or replaces a real service. Approve it only when
-you are ready to publish the dashboard.
 
 ## Uninstall
 
