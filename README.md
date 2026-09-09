@@ -85,14 +85,18 @@ to explore the tables, their grain, and the relationships between them.
 
 ## Charlie's expansion scenario
 
+> **🎯 Your north star**
+>
+> Recommend Charlie’s next San Francisco location and be prepared to defend it. The prompts below are suggestions, not a required sequence. Ask your own questions and follow whichever evidence interests you.
+
 Charlie's Coffee operates six San Francisco stores and is choosing where to open
-next. Run the featured prompts for the shortest path through the scenario, then
+next. Run the suggested prompts for the shortest path through the scenario, then
 choose any optional follow-ups that match your interests and available time.
 Continue in the same agent session so later prompts can build on earlier findings.
 
 ### Frame the decision
 
-#### Featured prompt
+#### Suggested prompt
 
 ```text
 According to the official Google Cloud documentation, why might AlloyDB be a
@@ -112,7 +116,7 @@ Charlie's wants to open a seventh San Francisco store. Help me make a recommenda
 
 ### Investigate unmet demand
 
-#### Featured prompt
+#### Suggested prompt
 
 ```text
 Where is Charlie's inventory failing to meet customer demand?
@@ -126,7 +130,7 @@ Can stock-movement history explain how those shortages developed?
 
 ### Check the customer evidence
 
-#### Featured prompt
+#### Suggested prompt
 
 ```text
 Use BigQuery AI to extract availability complaints from customer reviews.
@@ -145,7 +149,7 @@ Which complaints match specific store/product pairs, and which are ambiguous?
 
 ### Choose a new location
 
-#### Featured prompt
+#### Suggested prompt
 
 ```text
 Use BigQuery AI.FORECAST to forecast six months of candidate-market demand.
@@ -167,14 +171,18 @@ against Charlie's existing stores.
 What assumptions have the most influence on the ranking, and what would need to change for the runner-up to win?
 ```
 
-### Make it local (optional)
+> **⏸️ Facilitator checkpoint**
+>
+> Once your agent recommends a specific site, write it down. Continue exploring until the facilitator calls the room back together.
+
+### Make it local
 
 Want to explore somewhere you know? Bring Charlie's to your own spot. Replace
 `[LOCATION]` with anywhere in the world you'd like to explore; include the country
 if the name could be ambiguous. San Francisco's numbers remain business benchmarks.
 Skip this section to continue with your San Francisco recommendation.
 
-#### Featured prompt
+#### Suggested prompt
 
 ```text
 What if Charlie's expanded into [LOCATION]? Use Maps to suggest three areas
@@ -190,7 +198,7 @@ Pick a specific map anchor for a hypothetical store to explore next.
 
 ### Test the recommendation in the real world
 
-#### Featured prompt
+#### Suggested prompt
 
 ```text
 Use Maps to stress-test your recommended SF expansion spot. What nearby evidence
@@ -212,9 +220,13 @@ Which nearby residential areas could expand Charlie’s delivery reach through D
 Which nearby residential buildings and neighborhood anchors are within a 10-minute walk of the site and could contribute launch-day foot traffic?
 ```
 
+## Further exploration
+
+The remaining activities are for extra workshop time or continued exploration afterward.
+
 ### Plan the launch
 
-#### Featured prompt
+#### Suggested prompt
 
 ```text
 Design a launch-week plan for the recommended site using everything we have learned.
@@ -240,7 +252,7 @@ Revise the launch plan based on what you discovered.
 
 ### Visualize and share (optional)
 
-#### Featured prompt
+#### Suggested prompt
 
 ```text
 Build an interactive BI dashboard that helps our team explore Charlie's sales,
