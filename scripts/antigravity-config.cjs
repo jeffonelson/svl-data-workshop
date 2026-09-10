@@ -5,7 +5,15 @@ const {isDeepStrictEqual: equal} = require('node:util');
 const [mode, root, configDir, , , proxySuffix] = process.argv.slice(2);
 const state = path.join(root, '.workshop-state');
 const source = path.join(state, 'antigravity-source');
-const read = p => JSON.parse(fs.readFileSync(p, 'utf8'));
+function read(p) {
+  const text = fs.readFileSync(p, 'utf8');
+  try { return JSON.parse(text); } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    // Parser messages can quote credentials. Report only the path and category.
+    throw new Error((text.trim() ? 'Invalid JSON in ' : 'Empty JSON file: ') + p +
+      '. Setup stopped; preserve this file and repair it before retrying.');
+  }
+}
 const exists = p => !!fs.lstatSync(p, {throwIfNoEntry:false});
 function write(p, value) {
   fs.mkdirSync(path.dirname(p), {recursive:true});
