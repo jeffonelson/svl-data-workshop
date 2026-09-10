@@ -5,8 +5,10 @@ const {isDeepStrictEqual: equal} = require('node:util');
 const [mode, root, configDir, , , proxySuffix] = process.argv.slice(2);
 const state = path.join(root, '.workshop-state');
 const source = path.join(state, 'antigravity-source');
-function read(p) {
+function read(p, allowEmpty = false) {
   const text = fs.readFileSync(p, 'utf8');
+  // A blank global config has no settings to preserve. Only setup initializes it.
+  if (allowEmpty && !text.trim()) return {};
   try { return JSON.parse(text); } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
     // Parser messages can quote credentials. Report only the path and category.
@@ -26,7 +28,7 @@ function main() {
   const markerPath = path.join(state, 'antigravity-added-by-workshop.json');
   const pluginPath = path.join(configDir, 'plugins', 'dak');
   const legacyTarget = path.join(state, 'antigravity-plugin');
-  const cfg = fs.existsSync(configPath) ? read(configPath) : {};
+  const cfg = fs.existsSync(configPath) ? read(configPath, mode === 'setup') : {};
   if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg) ||
       (cfg.mcpServers && (typeof cfg.mcpServers !== 'object' || Array.isArray(cfg.mcpServers))))
     throw new Error('Invalid Antigravity MCP configuration; repair its JSON object before retrying.');
